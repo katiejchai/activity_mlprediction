@@ -1,3 +1,9 @@
+---
+output:
+  html_document:
+    keep_md: yes
+---
+
 # Qualitative Activity Recognition of Weight Lifting Exercises, Machine Learning Predictions
 
 The analysis detailed in this report is based on a study investigating the human activity recognition data of participants performing different executions of weightlifting, [Qualitative Activity Recognition of Weight Lifting Exercises](<http://web.archive.org/web/20170519033209/http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf>).
@@ -8,8 +14,9 @@ The goal of this report is to predict the qualitative class of weightlifting per
 
 Before anything, we will load all necessary libraries.
 
-```{r, libraries}
-library(tidyverse); library(caret); library(parallel); library(doParallel)
+```{r, message=FALSE, libraries}
+library(tidyverse); library(caret); 
+library(parallel); library(doParallel)
 library(corrplot); library(rattle)
 ```
 
@@ -154,7 +161,7 @@ Based on these results, all models excluding the linear discriminant analysis mo
 
 ## Final Predictions
 
-The final predictions for the classes for the 20 observations in the validation set, based on the random forest model, are shown below. The expected out-of-sample accuracy has a 95% confidence interval of 99.13% to 99.5%.
+The final predictions for the classes for the 20 observations in the validation set, based on the random forest model, are shown below. The expected out-of-sample accuracy has a 95% confidence interval of 99.13% to 99.5%. Consequently, the out-of-sample error, which is defined as $1-accuracy$, has a 95% confidence interval of 0.5% to 0.87%.
 
 ```{r, finalprediction}
 predict(rfFit, newdata=validation)
