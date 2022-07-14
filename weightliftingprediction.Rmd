@@ -1,0 +1,161 @@
+# Qualitative Activity Recognition of Weight Lifting Exercises, Machine Learning Predictions
+
+The analysis detailed in this report is based on a study investigating the human activity recognition data of participants performing different executions of weightlifting, [Qualitative Activity Recognition of Weight Lifting Exercises](<http://web.archive.org/web/20170519033209/http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf>).
+
+The goal of this report is to predict the qualitative class of weightlifting performed by a subject based on a variety of quantitative features, measured by accelerometers attached to different points of the subjects' bodies.
+
+## Loading and Cleaning Data
+
+Before anything, we will load all necessary libraries.
+
+```{r, libraries}
+library(tidyverse); library(caret); library(parallel); library(doParallel)
+library(corrplot); library(rattle)
+```
+
+Now, load the given datasets with NA values set as blank observations or "NA"s.
+
+```{r, download}
+pmldf <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("","NA"), stringsAsFactors=TRUE)
+validation <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings=c("","NA"), stringsAsFactors=TRUE)
+```
+
+To clean the dataset, we will remove the variables with a majority of NA values (using a threshold of 80%), as well as any variables that have near zero variance, as these will add minimal, if any, information to the models. We will also remove the descriptive variables that do not affect the outcome (subject name, time, etc.)
+
+```{r, cleanpmldf}
+pmldf <- pmldf[,!(apply(is.na(pmldf), 2, mean) > 0.8)]
+pmldf <- pmldf[,-nearZeroVar(pmldf)]
+pmldf <- pmldf[,-c(1:6)]
+```
+
+The pmldf dataset will be split again so that we can test the accuracy of models developed on the training set onto the testing set, and choose the best model of these to form final predictions on the validation set. The seed has been set to ensure reproducibility of the results.
+
+```{r, traintestsplit}
+set.seed(1234)
+inTrain <- createDataPartition(y=pmldf$classe, p=0.6, list=FALSE)
+training <- pmldf[inTrain,]
+testing <- pmldf[-inTrain,]
+```
+
+We will also update the validation dataset to contain only the selected variables in the training set.
+
+```{r, cleanvalidation}
+validation <- validation %>% select(colnames(training)[-length(training)])
+```
+
+## Exploratory Data Analysis
+
+As an initial exploratory analysis on the data, we will plot the correlations between the remaining predictors of the training dataset.
+
+```{r, corrplot}
+corrplot(cor(training[,-length(training)]), 
+         method="color", type="lower", order="alphabet", 
+         tl.cex=0.5, tl.col="black", mar=c(0,0,1,0),
+         title="Corrlation Plot of Training Dataset Predictors")
+```
+
+Based on this plot, it is evident that many of the predictors are strongly correlated with one another, based on the number of darkly colored squares in the plot above. Therefore, simple regression may not be the best of choices for modeling the variables' effects on classe.
+
+## Model Building
+
+To build the best model to predict the type of exercise based on these variables, four different methods will be used: decision tree, random forest, linear discriminant analysis, and gradient boosting.
+
+We will use 5-fold cross-validation, along with parallel processing. A k-value of 5 was chosen in an attempt to balance between the less bias but more variance characteristic of large k-values, and the less variance but more bias characteristic of smaller k-values. The setup of parallel processing was included after referencing [Improving Performance of Random Forest with caret::train()](https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md) by Len Greski.
+
+```{r, crossvalidate}
+cluster <- makeCluster(detectCores()-1)
+registerDoParallel(cluster)
+fitControl <- trainControl(method="cv", number=5, allowParallel=TRUE)
+```
+
+### Decision Tree
+
+A plot of the final decision tree is shown below.
+
+```{r, decisiontree}
+set.seed(55)
+dtFit <- train(classe ~ ., data=training, method="rpart", 
+               trControl=fitControl)
+fancyRpartPlot(dtFit$finalModel, sub="")
+```
+
+### Random Forest
+
+A summary of the final model is shown below.
+
+```{r, randomforest}
+set.seed(55)
+rfFit <- train(classe ~ ., data=training, method="rf", 
+               trControl=fitControl, verbose=FALSE)
+rfFit$finalModel
+```
+
+### Linear Discriminant Analysis
+
+No visualizations are available, but the respective code is shown below.
+
+```{r, lineardiscriminantanalysis}
+set.seed(55)
+ldFit <- train(classe ~ ., data=training, method="lda", 
+               trControl=fitControl, verbose=FALSE)
+```
+
+### Gradient Boosting Machine Model
+
+A plot of the model accuracy vs. number of boosting iterations is shown below.
+
+```{r, gradientboostingmachine}
+set.seed(55)
+gbFit <- train(classe ~ ., data=training, method="gbm", 
+               trControl=fitControl, verbose=FALSE)
+plot(gbFit)
+```
+
+## Testing Accuracies
+
+To test the out-of-sample accuracies, the models were used to predict the classes of the testing set, and these predictions were compared with the actual observed values to calculate model accuracy.
+
+```{r, predictions}
+dtPred <- predict(dtFit, newdata=testing)
+rfPred <- predict(rfFit, newdata=testing)
+ldPred <- predict(ldFit, newdata=testing)
+gbPred <- predict(gbFit, newdata=testing)
+```
+
+The confusion matrices of each of the models, which provide multiple different measures of model accuracy, are shown below. We will be using the measure, "Accuracy", for comparisons.
+
+### Decision Tree
+
+```{r, dtaccuracy}
+confusionMatrix(factor(testing$classe), dtPred)
+```
+
+### Random Forest
+
+```{r, rfaccuracy}
+confusionMatrix(factor(testing$classe), rfPred)
+```
+
+### Linear Discriminant Analysis
+
+```{r, ldaccuracy}
+confusionMatrix(factor(testing$classe), ldPred)
+```
+
+### Gradient Boosting Machine Model
+
+```{r, gbaccuracy}
+confusionMatrix(factor(testing$classe), gbPred)
+```
+
+### Best Model
+
+Based on these results, all models excluding the linear discriminant analysis model seem to have very high (greater than 95%) accuracy values. However, the random forest method had the highest out-of-sample accuracy of 99.34%. Consequently, this method will be used in the final predictions for the validation set.
+
+## Final Predictions
+
+The final predictions for the classes for the 20 observations in the validation set, based on the random forest model, are shown below. The expected out-of-sample accuracy has a 95% confidence interval of 99.13% to 99.5%.
+
+```{r, finalprediction}
+predict(rfFit, newdata=validation)
+```
