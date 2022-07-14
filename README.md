@@ -4,4 +4,4 @@ The analysis detailed in this report is based on a study investigating the human
 
 The goal of this report is to predict the qualitative class of weightlifting performed by a subject based on a variety of quantitative features, measured by accelerometers attached to different points of the subjects' bodies.
 
-To view the HTML file as a webpage, visit the following [link](https://htmlpreview.github.io/?https://github.com/katiejchai/activity_mlprediction/blob/main/weightliftingprediction.html).
+To view the HTML file as a webpage, visit the following link: https://katiejchai.github.io/activity_mlprediction/.
